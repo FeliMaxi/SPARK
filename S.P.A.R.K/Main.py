@@ -43,9 +43,9 @@ class MainWindow(QMainWindow):
         self.actualizar_labels()
 
     def actualizar_labels(self):
-        # Usa setText() para cambiar el texto de los labels
-        self.ui.label.setText(f"Distancia: {self.Distancia}cm")
+        self.ui.label.setText(f"Distancia: {self.Distancia} cm")
         self.ui.label_2.setText(self.Alerta)
+
 
 class Inicioscreen(QMainWindow):
     def __init__(self):
