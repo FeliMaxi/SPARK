@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'MainWindow - untitledYeuxwv.ui'
+## Form generated from reading UI file 'MainWindow - untitlednuxkxy.ui'
 ##
 ## Created by: Qt User Interface Compiler version 6.9.3
 ##
@@ -27,10 +27,16 @@ class Ui_MainWindow(object):
         self.centralwidget.setObjectName(u"centralwidget")
         self.label = QLabel(self.centralwidget)
         self.label.setObjectName(u"label")
-        self.label.setGeometry(QRect(60, 120, 161, 21))
+        self.label.setGeometry(QRect(100, 140, 381, 71))
+        font = QFont()
+        font.setPointSize(40)
+        self.label.setFont(font)
         self.label_2 = QLabel(self.centralwidget)
         self.label_2.setObjectName(u"label_2")
-        self.label_2.setGeometry(QRect(60, 160, 201, 21))
+        self.label_2.setGeometry(QRect(150, 230, 321, 61))
+        font1 = QFont()
+        font1.setPointSize(30)
+        self.label_2.setFont(font1)
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(MainWindow)
         self.menubar.setObjectName(u"menubar")

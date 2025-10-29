@@ -16,6 +16,18 @@ import nombre de la clase del archivo convertido
 """
 from UI_Spark import Ui_MainWindow
 
+Distance = 20
+
+if Distance > 23:
+  Alert = 'Muy lejos'
+elif 24 > Distance > 17:
+    Alert = 'Perfecto'
+elif 18 > Distance:
+    Alert = 'Muy cerca'
+else: 'Sin datos'
+
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -23,15 +35,15 @@ class MainWindow(QMainWindow):
         self.ui.setupUi(self)
 
         # Variables de ejemplo
-        self.Distancia = "50 cm"
-        self.Alerta = "Todo seguro ✅"
+        self.Distancia = Distance
+        self.Alerta = Alert
 
         # Mostrar los valores en los labels
         self.actualizar_labels()
 
     def actualizar_labels(self):
         # Usa setText() para cambiar el texto de los labels
-        self.ui.label.setText(f"Distancia: {self.Distancia}")
+        self.ui.label.setText(f"Distancia: {self.Distancia}cm")
         self.ui.label_2.setText(self.Alerta)
 
 print("""
