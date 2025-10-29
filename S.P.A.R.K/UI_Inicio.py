@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ################################################################################
-## Form generated from reading UI file 'untitledbzZvIJ.ui'
+## Form generated from reading UI file 'untitledKOsNdD.ui'
 ##
 ## Created by: Qt User Interface Compiler version 6.9.3
 ##
@@ -15,7 +15,7 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QApplication, QLabel, QMainWindow, QMenuBar,
+from PySide6.QtWidgets import (QApplication, QFrame, QMainWindow, QMenuBar,
     QPushButton, QSizePolicy, QStatusBar, QWidget)
 
 class Ui_InicioScreen(object):
@@ -27,17 +27,16 @@ class Ui_InicioScreen(object):
         self.centralwidget.setObjectName(u"centralwidget")
         self.startButton = QPushButton(self.centralwidget)
         self.startButton.setObjectName(u"startButton")
-        self.startButton.setGeometry(QRect(290, 270, 201, 81))
+        self.startButton.setGeometry(QRect(290, 340, 201, 81))
         font = QFont()
         font.setPointSize(40)
         self.startButton.setFont(font)
         self.startButton.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.Titulo = QLabel(self.centralwidget)
-        self.Titulo.setObjectName(u"Titulo")
-        self.Titulo.setGeometry(QRect(250, 50, 271, 131))
-        font1 = QFont()
-        font1.setPointSize(50)
-        self.Titulo.setFont(font1)
+        self.frame = QFrame(self.centralwidget)
+        self.frame.setObjectName(u"frame")
+        self.frame.setGeometry(QRect(240, 10, 291, 261))
+        self.frame.setFrameShape(QFrame.Shape.StyledPanel)
+        self.frame.setFrameShadow(QFrame.Shadow.Raised)
         InicioScreen.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(InicioScreen)
         self.menubar.setObjectName(u"menubar")
@@ -55,5 +54,4 @@ class Ui_InicioScreen(object):
     def retranslateUi(self, InicioScreen):
         InicioScreen.setWindowTitle(QCoreApplication.translate("InicioScreen", u"MainWindow", None))
         self.startButton.setText(QCoreApplication.translate("InicioScreen", u"START", None))
-        self.Titulo.setText(QCoreApplication.translate("InicioScreen", u"S.P.A.R.K", None))
     # retranslateUi

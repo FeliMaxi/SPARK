@@ -8,7 +8,7 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
 from PySide6.QtWidgets import (QApplication, QMainWindow, QMenuBar, QSizePolicy,
-    QStatusBar, QWidget)
+    QStatusBar, QWidget, QLabel)
 
 """
 from Archivo convertido con pyside2-uic archivo.ui > interfaz.py
@@ -53,6 +53,19 @@ class Inicioscreen(QMainWindow):
         self.ui = Ui_InicioScreen()
         self.ui.setupUi(self)
 
+        # === Mostrar imagen SPARK.png dentro del frame ===
+        self.logo_label = QLabel(self.ui.frame)  # <--- QLabel con L mayúscula
+        pixmap = QPixmap("SPARK.png")  # Ruta de la imagen
+        self.logo_label.setPixmap(pixmap)
+        self.logo_label.setScaledContents(True)  # Ajusta el tamaño al frame
+
+        # Asegura que el label ocupe todo el frame
+        self.logo_label.setGeometry(self.ui.frame.rect())
+
+        # Si querés que se mantenga centrada y se actualice al redimensionar:
+        self.ui.frame.installEventFilter(self)
+
+        
         # Conectamos el botón para volver a la ventana principal
         self.ui.startButton.clicked.connect(self.ir_a_principal)
 
