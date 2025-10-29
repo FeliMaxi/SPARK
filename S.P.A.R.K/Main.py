@@ -15,6 +15,7 @@ from Archivo convertido con pyside2-uic archivo.ui > interfaz.py
 import nombre de la clase del archivo convertido
 """
 from UI_Spark import Ui_MainWindow
+from UI_Inicio import Ui_InicioScreen
 
 Distance = 20
 
@@ -46,6 +47,23 @@ class MainWindow(QMainWindow):
         self.ui.label.setText(f"Distancia: {self.Distancia}cm")
         self.ui.label_2.setText(self.Alerta)
 
+class Inicioscreen(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.ui = Ui_InicioScreen()
+        self.ui.setupUi(self)
+
+        # Conectamos el botón para volver a la ventana principal
+        self.ui.startButton.clicked.connect(self.ir_a_principal)
+
+    def ir_a_principal(self):
+        self.main_window = MainWindow()
+        self.main_window.show()
+        self.close()  # o self.hide()
+
+
+
+
 print("""
    _____ ____  ___    ____  __ __
   / ___// __ \/   |  / __ \/ //_/
@@ -62,7 +80,7 @@ Sensor de Proximidad Automático
 
 if __name__ == "__main__": #checkea si el script está siendo ejecutado como el prog principal (no importado como un modulo).
     app = QApplication(sys.argv)    # Crea un Qt widget, la cual va ser nuestra ventana.
-    window = MainWindow() #crea una intancia de MainWindow 
+    window = Inicioscreen() #crea una intancia de MainWindow 
     window.show() # IMPORTANT!!!!! la ventanas estan ocultas por defecto.
     sys.exit(app.exec()) # Start the event loop.
 
