@@ -43,7 +43,7 @@ if response.status_code == 200:
     descripcion = data["weather"][0]["description"]
     clm = f"{temp}°C — {descripcion.capitalize()}"
 else:
-    clm = "Error al obtener el clima"
+    clm = "Sin datos"
 
 # === MAIN WINDOW ===
 
@@ -64,7 +64,7 @@ class MainWindow(QMainWindow):
     def actualizar_labels(self):
         self.ui.label.setText(f"Distancia: {self.Distancia} cm")
         self.ui.label_2.setText(self.Alerta)
-        self.ui.label_3.setText(self.clima)
+        self.ui.label_3.setText(f"Clima: {self.clima}")
 
 # === INICIO SCREEN ===
 class Inicioscreen(QMainWindow):
