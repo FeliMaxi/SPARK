@@ -11,7 +11,7 @@ void setup() {
   pinMode(LED_AMARILLO, OUTPUT);
   pinMode(LED_ROJO, OUTPUT);
 
-  
+  Serial.begin(9600); 
 }
 
 long medirDistancia() {
@@ -47,5 +47,9 @@ void loop() {
     digitalWrite(LED_VERDE, HIGH);
   }
 
+  // 🔹 Enviar la distancia a Python
+  Serial.println(distancia);
+
   delay(200);
 }
+
