@@ -1,4 +1,5 @@
 import sys
+import requests
 from PySide6.QtGui import QPixmap
 from PySide6.QtCore import (QCoreApplication, QDate, QDateTime, QLocale,
     QMetaObject, QObject, QPoint, QRect,
@@ -17,6 +18,7 @@ import nombre de la clase del archivo convertido
 from UI_Spark import Ui_MainWindow
 from UI_Inicio import Ui_InicioScreen
 
+# === DISTANCIA ===
 Distance = 20
 
 if Distance > 23:
@@ -25,9 +27,25 @@ elif 24 > Distance > 17:
     Alert = 'Perfecto'
 elif 18 > Distance:
     Alert = 'Muy cerca'
-else: 'Sin datos'
+else: Alert = 'Sin datos'
 
+# === CLIMA ===
 
+API_KEY = 'c01a0cfb38073ea9a2b467ebd0287997'
+CIUDAD = "Cordoba,AR"  
+URL = f"http://api.openweathermap.org/data/2.5/weather?q={CIUDAD}&appid={API_KEY}&units=metric&lang=es"
+
+response = requests.get(URL)
+data = response.json()
+
+if response.status_code == 200:
+    temp = data["main"]["temp"]
+    descripcion = data["weather"][0]["description"]
+    clm = f"{temp}°C — {descripcion.capitalize()}"
+else:
+    clm = "Error al obtener el clima"
+
+# === MAIN WINDOW ===
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -38,6 +56,7 @@ class MainWindow(QMainWindow):
         # Variables de ejemplo
         self.Distancia = Distance
         self.Alerta = Alert
+        self.clima = clm
 
         # Mostrar los valores en los labels
         self.actualizar_labels()
@@ -45,15 +64,16 @@ class MainWindow(QMainWindow):
     def actualizar_labels(self):
         self.ui.label.setText(f"Distancia: {self.Distancia} cm")
         self.ui.label_2.setText(self.Alerta)
+        self.ui.label_3.setText(self.clima)
 
-
+# === INICIO SCREEN ===
 class Inicioscreen(QMainWindow):
     def __init__(self):
         super().__init__()
         self.ui = Ui_InicioScreen()
         self.ui.setupUi(self)
 
-        # === Mostrar imagen SPARK.png dentro del frame ===
+        # --- Mostrar imagen SPARK.png dentro del frame ---
         self.logo_label = QLabel(self.ui.frame)  # <--- QLabel con L mayúscula
         pixmap = QPixmap("SPARK.png")  # Ruta de la imagen
         self.logo_label.setPixmap(pixmap)
