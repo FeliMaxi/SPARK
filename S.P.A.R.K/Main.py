@@ -1,82 +1,154 @@
+# -*- coding: utf-8 -*-
 import sys
+import time
+import os
+import serial
+import requests
 from PySide6.QtGui import QPixmap
-from PySide6.QtCore import (QCoreApplication, QDate, QDateTime, QLocale,
-    QMetaObject, QObject, QPoint, QRect,
-    QSize, QTime, QUrl, Qt)
-from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
-    QFont, QFontDatabase, QGradient, QIcon,
-    QImage, QKeySequence, QLinearGradient, QPainter,
-    QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QApplication, QMainWindow, QMenuBar, QSizePolicy,
-    QStatusBar, QWidget, QLabel)
+from PySide6.QtCore import QTimer, QEvent
+from PySide6.QtWidgets import QApplication, QMainWindow, QLabel
 
-"""
-from Archivo convertido con pyside2-uic archivo.ui > interfaz.py
-import nombre de la clase del archivo convertido
-"""
+# === IMPORTACIÓN DE UI ===
 from UI_Spark import Ui_MainWindow
 from UI_Inicio import Ui_InicioScreen
 
-Distance = 20
 
-if Distance > 23:
-  Alert = 'Muy lejos'
-elif 24 > Distance > 17:
-    Alert = 'Perfecto'
-elif 18 > Distance:
-    Alert = 'Muy cerca'
-else: 'Sin datos'
+# === CONFIGURACIÓN CLIMA ===
+API_KEY = 'c01a0cfb38073ea9a2b467ebd0287997'  # tu clave de OpenWeather
+CIUDAD = "Cordoba,AR"
+URL = f"http://api.openweathermap.org/data/2.5/weather?q={CIUDAD}&appid={API_KEY}&units=metric&lang=es"
 
 
+def obtener_clima():
+    """Obtiene el clima actual y devuelve un texto para mostrar."""
+    try:
+        response = requests.get(URL, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            temp = data["main"]["temp"]
+            descripcion = data["weather"][0]["description"]
+            return f"{temp}°C — {descripcion.capitalize()}"
+        else:
+            return "Sin datos"
+    except Exception as e:
+        print("Error obteniendo clima:", e)
+        return "Sin datos"
 
+
+# === VENTANA PRINCIPAL ===
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
 
-        # Variables de ejemplo
-        self.Distancia = Distance
-        self.Alerta = Alert
+        # Variables iniciales
+        self.Distancia = 0
+        self.Alerta = "Sin datos"
+        self.clima = obtener_clima()
 
-        # Mostrar los valores en los labels
+        # Intentar conectar con Arduino
+        try:
+            self.arduino = serial.Serial('/dev/ttyACM0', 9600)
+            time.sleep(2)
+            print("✅ Conectado a Arduino correctamente.")
+        except Exception as e:
+            print("⚠️ No se pudo conectar al Arduino:", e)
+            self.arduino = None
+
+        # Timer para leer datos del Arduino
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.actualizar_datos)
+        self.timer.start(200)
+
+        # Timer para actualizar el clima cada 10 minutos
+        self.timer_clima = QTimer()
+        self.timer_clima.timeout.connect(self.actualizar_clima)
+        self.timer_clima.start(600000)
+
         self.actualizar_labels()
 
+    # === Actualizar la interfaz ===
     def actualizar_labels(self):
-        self.ui.label.setText(f"Distancia: {self.Distancia} cm")
-        self.ui.label_2.setText(self.Alerta)
+            self.ui.label.setText(f"Distancia: {int(self.Distancia/10)} cm")
+            self.ui.label_2.setText(self.Alerta)
+            self.ui.label_3.setText(f"Clima: {self.clima}")
+            self.ui.label.repaint()
+            self.ui.label_2.repaint()
+            self.ui.label_3.repaint()
+
+    # === Lectura de datos desde Arduino ===
+    def actualizar_datos(self):
+        if self.arduino and self.arduino.in_waiting > 0:
+            try:
+                linea = self.arduino.readline().decode(errors="ignore").strip()
+                print("Dato recibido:", linea)  # 👈 DEBUG
+                if linea.isdigit():
+                    distancia = int(linea)
+                    alerta = self.calcular_alerta(distancia)
+                    self.Distancia = distancia
+                    self.Alerta = alerta
+                    self.actualizar_labels()
+            except Exception as e:
+                print("Error leyendo del Arduino:", e)
+
+    # === Cálculo de alerta según distancia ===
+    
+    def calcular_alerta(self, distancia):
+        distance = distancia /10
+        if distance > 20:
+            return 'Muy lejos'
+        elif 20 >= distance > 10:
+            return 'Baja la velocidad'
+        elif 10 >= distance > 0:
+            return 'Cuidado'
+        elif 0 >= distance:
+            return 'R.I.P'
+        else:
+            return 'Sin datos'
+
+    # === Actualiza el clima periódicamente ===
+    def actualizar_clima(self):
+        self.clima = obtener_clima()
+        self.actualizar_labels()
 
 
+# === PANTALLA DE INICIO ===
 class Inicioscreen(QMainWindow):
     def __init__(self):
         super().__init__()
         self.ui = Ui_InicioScreen()
         self.ui.setupUi(self)
 
-        # === Mostrar imagen SPARK.png dentro del frame ===
-        self.logo_label = QLabel(self.ui.frame)  # <--- QLabel con L mayúscula
-        pixmap = QPixmap("SPARK.png")  # Ruta de la imagen
+        # === Imagen dentro del frame ===
+        ruta_logo = os.path.join(os.path.dirname(__file__), "SPARK.png")
+        self.logo_label = QLabel(self.ui.frame)
+        pixmap = QPixmap(ruta_logo)
+        if pixmap.isNull():
+            print("⚠️ No se encontró la imagen:", ruta_logo)
         self.logo_label.setPixmap(pixmap)
-        self.logo_label.setScaledContents(True)  # Ajusta el tamaño al frame
-
-        # Asegura que el label ocupe todo el frame
+        self.logo_label.setScaledContents(True)
         self.logo_label.setGeometry(self.ui.frame.rect())
 
-        # Si querés que se mantenga centrada y se actualice al redimensionar:
+        # Para redimensionar automáticamente con el frame
         self.ui.frame.installEventFilter(self)
 
-        
-        # Conectamos el botón para volver a la ventana principal
+        # Botón para abrir la ventana principal
         self.ui.startButton.clicked.connect(self.ir_a_principal)
+
+    def eventFilter(self, source, event):
+        """Ajusta el tamaño del logo cuando se cambia el tamaño del frame."""
+        if source == self.ui.frame and event.type() == QEvent.Resize:
+            self.logo_label.setGeometry(self.ui.frame.rect())
+        return super().eventFilter(source, event)
 
     def ir_a_principal(self):
         self.main_window = MainWindow()
         self.main_window.show()
-        self.close()  # o self.hide()
+        self.close()
 
 
-
-
+# === ASCII LOGO ===
 print("""
    _____ ____  ___    ____  __ __
   / ___// __ \/   |  / __ \/ //_/
@@ -85,16 +157,14 @@ print("""
 /____/_/   /_/  |_/_/ |_/_/ |_|  
 Sensor de Proximidad Automático 
     para Riesgos Kinéticos                             
-      """)
+""")
 
 
-
-
-
-if __name__ == "__main__": #checkea si el script está siendo ejecutado como el prog principal (no importado como un modulo).
-    app = QApplication(sys.argv)    # Crea un Qt widget, la cual va ser nuestra ventana.
-    window = Inicioscreen() #crea una intancia de MainWindow 
-    window.show() # IMPORTANT!!!!! la ventanas estan ocultas por defecto.
-    sys.exit(app.exec()) # Start the event loop.
+# === MAIN ===
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = Inicioscreen()
+    window.show()
+    sys.exit(app.exec())
 
 # Never gonna give you up
