@@ -4,6 +4,7 @@ import time
 import os
 import serial
 import requests
+import platform
 from PySide6.QtGui import QPixmap
 from PySide6.QtCore import QTimer, QEvent
 from PySide6.QtWidgets import QApplication, QMainWindow, QLabel
@@ -12,9 +13,8 @@ from PySide6.QtWidgets import QApplication, QMainWindow, QLabel
 from UI_Spark import Ui_MainWindow
 from UI_Inicio import Ui_InicioScreen
 
-
 # === CONFIGURACIÓN CLIMA ===
-API_KEY = 'c01a0cfb38073ea9a2b467ebd0287997'  # tu clave de OpenWeather
+API_KEY = 'c01a0cfb38073ea9a2b467ebd0287997'
 CIUDAD = "Cordoba,AR"
 URL = f"http://api.openweathermap.org/data/2.5/weather?q={CIUDAD}&appid={API_KEY}&units=metric&lang=es"
 
@@ -35,6 +35,19 @@ def obtener_clima():
         return "Sin datos"
 
 
+# === FUNCIÓN PARA DETECTAR SISTEMA OPERATIVO Y PUERTO ===
+def puerto_arduino():
+    """Devuelve el nombre del puerto correcto según el sistema operativo."""
+    sistema = platform.system()
+    if sistema == "Windows":
+        return "COM3"  # ⚠️ Cambiar si tu Arduino usa otro COM
+    elif sistema == "Linux":
+        return "/dev/ttyACM0"
+    else:
+        print("⚠️ Sistema operativo no reconocido. Usando /dev/ttyACM0 por defecto.")
+        return "/dev/ttyACM0"
+
+
 # === VENTANA PRINCIPAL ===
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -47,9 +60,11 @@ class MainWindow(QMainWindow):
         self.Alerta = "Sin datos"
         self.clima = obtener_clima()
 
-        # Intentar conectar con Arduino
+        # Intentar conectar con Arduino según la plataforma
         try:
-            self.arduino = serial.Serial('/dev/ttyACM0', 9600)
+            puerto = puerto_arduino()
+            print(f"Intentando conectar al Arduino en {puerto}...")
+            self.arduino = serial.Serial(puerto, 9600)
             time.sleep(2)
             print("✅ Conectado a Arduino correctamente.")
         except Exception as e:
@@ -70,12 +85,12 @@ class MainWindow(QMainWindow):
 
     # === Actualizar la interfaz ===
     def actualizar_labels(self):
-            self.ui.label.setText(f"Distancia: {int(self.Distancia/10)} cm")
-            self.ui.label_2.setText(self.Alerta)
-            self.ui.label_3.setText(f"Clima: {self.clima}")
-            self.ui.label.repaint()
-            self.ui.label_2.repaint()
-            self.ui.label_3.repaint()
+        self.ui.label.setText(f"Distancia: {int(self.Distancia/10)} cm")
+        self.ui.label_2.setText(self.Alerta)
+        self.ui.label_3.setText(f"Clima: {self.clima}")
+        self.ui.label.repaint()
+        self.ui.label_2.repaint()
+        self.ui.label_3.repaint()
 
     # === Lectura de datos desde Arduino ===
     def actualizar_datos(self):
@@ -93,9 +108,8 @@ class MainWindow(QMainWindow):
                 print("Error leyendo del Arduino:", e)
 
     # === Cálculo de alerta según distancia ===
-    
     def calcular_alerta(self, distancia):
-        distance = distancia /10
+        distance = distancia / 10
         if distance > 20:
             return 'Muy lejos'
         elif 20 >= distance > 10:
@@ -148,7 +162,7 @@ class Inicioscreen(QMainWindow):
         self.close()
 
 
-# === ASCII LOGO ===
+# === ASCII ART ===
 print("""
    _____ ____  ___    ____  __ __
   / ___// __ \/   |  / __ \/ //_/
