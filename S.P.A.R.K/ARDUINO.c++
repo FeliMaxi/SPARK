@@ -4,6 +4,9 @@
 #define TRIG 5
 #define ECHO 6
 
+long limite_rojo = 20;      
+long limite_amarillo = 40;
+
 void setup() {
   pinMode(TRIG, OUTPUT);
   pinMode(ECHO, INPUT);
@@ -29,14 +32,28 @@ long medirDistancia() {
 }
 
 void loop() {
-  long distancia = medirDistancia();
 
-  if (distancia <= 40) {
+  if (Serial.available() > 0) {
+    String data = Serial.readStringUntil('\n');
+    int sep = data.indexOf(',');
+    if (sep > 0) {
+      limite_rojo = data.substring(0, sep).toInt();
+      limite_amarillo = data.substring(sep + 1).toInt();
+      Serial.print("Nuevos limites: ");
+      Serial.print(limite_rojo);
+      Serial.print(" / ");
+      Serial.println(limite_amarillo);
+    }
+  long distancia = medirDistancia();
+  Serial.print("Distancia: ");
+  Serial.println(distancia);
+
+  if (distancia <= limite_rojo) {
     digitalWrite(LED_ROJO, HIGH);
     digitalWrite(LED_AMARILLO, LOW);
     digitalWrite(LED_VERDE, LOW);
   }
-  else if (distancia > 40 && distancia <= 80) {
+  else if (distancia > limite_rojo && distancia <= limite_amarillo) {
     digitalWrite(LED_ROJO, LOW);
     digitalWrite(LED_AMARILLO, HIGH);
     digitalWrite(LED_VERDE, LOW);
@@ -46,10 +63,7 @@ void loop() {
     digitalWrite(LED_AMARILLO, LOW);
     digitalWrite(LED_VERDE, HIGH);
   }
-
-  // 🔹 Enviar la distancia a Python
   Serial.println(distancia);
 
   delay(200);
 }
-
