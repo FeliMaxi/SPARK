@@ -44,32 +44,41 @@ class ConfigWindow(QMainWindow):
         self.ui.setupUi(self)
         self.parent_window = parent
 
-        # Configurar botón "Confirmar" para aplicar parámetros y volver
         self.ui.pushButton.clicked.connect(self.aplicar_parametros)
 
     def aplicar_parametros(self):
-        """Lee los valores de los SpinBox y los aplica a la ventana Spark."""
+        """
+        Lee los valores de los SpinBox, los aplica a la ventana Spark
+        y los envía al Arduino para actualizar la lógica de los LEDs.
+        """
         if not self.parent_window:
             return
 
         limite_rojo = self.ui.spinBox.value()
         limite_amarillo = self.ui.spinBox_2.value()
 
-        
         if limite_rojo >= limite_amarillo:
             print("El límite rojo debe ser menor que el amarillo.")
             return
 
-        
+        # 1. Asigna los nuevos límites a la ventana principal de Python (para la UI)
         self.parent_window.limite_rojo = limite_rojo
         self.parent_window.limite_amarillo = limite_amarillo
 
-        print(f"Nuevos límites aplicados: rojo={limite_rojo} cm, amarillo={limite_amarillo} cm")
-
+        # 2. **ENVÍO DE LÍMITES AL ARDUINO**
+        if self.parent_window.arduino and self.parent_window.arduino.is_open:
+            try:
+                mensaje = f"L{limite_rojo}:{limite_amarillo}\n"
+                self.parent_window.arduino.write(mensaje.encode('utf-8'))
+                print(f"DEBUG: Enviado a Arduino: {mensaje.strip()}")
+            except Exception as e:
+                print(f"DEBUG: Error al enviar límites al Arduino: {e}")
         
+        print(f"Nuevos límites aplicados en Python: rojo={limite_rojo} cm, amarillo={limite_amarillo} cm")
+
+        # 3. Vuelve a la pantalla principal
         self.close()
         self.parent_window.show()
-
 
 
 # === MAIN WINDOW ===
@@ -93,13 +102,11 @@ class MainWindow(QMainWindow):
         puerto = detectar_puerto_arduino()
         if puerto:
             try:
-                self.arduino = serial.Serial(puerto, 9600, timeout=1)
+                # CAMBIO 1: Reducción del timeout a 0.1 segundos para evitar bloqueos largos
+                self.arduino = serial.Serial(puerto, 9600, timeout=0.1) 
                 print(f"Conectado al Arduino en {puerto}")
                 
-                # **MEJORA CLAVE 1: Limpieza del buffer serial**
-                # Esperar 2 segundos para que el Arduino se reinicie y esté listo
                 time.sleep(2) 
-                # Limpiar el buffer de entrada para descartar datos viejos/basura
                 self.arduino.flushInput() 
                 
             except serial.SerialException:
@@ -111,7 +118,8 @@ class MainWindow(QMainWindow):
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.leer_dato)
-        self.timer.start(500) # Llama a leer_dato cada 500ms
+        # CAMBIO 2: Aumento de la frecuencia del timer a 200ms
+        self.timer.start(200) 
 
     def abrir_config(self):
         """Abre la ventana de configuración y oculta la actual."""
@@ -122,37 +130,35 @@ class MainWindow(QMainWindow):
     def leer_dato(self):
         if self.arduino and self.arduino.in_waiting > 0:
             try:
-                # 1. Lee la línea completa (hasta el \n)
+                # En este contexto, leer una línea a la vez es suficiente con el timeout bajo.
                 linea_serial = self.arduino.readline() 
-                
-                # 2. Decodifica y limpia espacios/caracteres de nueva línea
                 dato_str = linea_serial.decode('utf-8').strip()
                 
-                # **MEJORA CLAVE 2: Protocolo estricto con prefijo 'D'**
+                # PROTOCOLO ESTRICTO CON PREFIJO 'D'
                 if dato_str.startswith('D'):
-                    # Quitamos el prefijo 'D' para obtener solo el valor numérico
                     distancia_data = dato_str[1:] 
                     
-                    # Verificamos que el resto de la cadena sea un dígito
                     if distancia_data.isdigit():
                         distancia = int(distancia_data)
                         self.actualizar_distancia(distancia)
                     else:
-                        # Esto se ejecuta si la lectura es "Dbasura"
-                        print(f"Error: Dato después del prefijo 'D' no es numérico: {distancia_data}. Ignorado.")
+                        print(f"DEBUG: Error -> Dato después del prefijo 'D' no es numérico: {distancia_data}. Ignorado.")
                 
+                else:
+                    if dato_str:
+                         print(f"DEBUG: Mensaje Serial Ignorado: {dato_str}")
+
             except UnicodeDecodeError:
-                # Ocurre si hay bytes incompletos o inválidos. Se ignora.
-                print("Error de decodificación Unicode. Dato ignorado.")
+                print("DEBUG: Error de decodificación Unicode. Dato ignorado.")
             except Exception as e:
-                # Para capturar cualquier otro error inesperado
-                print(f"Error inesperado en lectura serial: {e}")
+                print(f"DEBUG: Error inesperado en lectura serial: {e}")
 
 
     def actualizar_distancia(self, distancia):
         """Evalúa la distancia según los límites configurados y actualiza la UI."""
         self.ui.label.setText(f"{distancia} cm")
 
+        # Lógica de la UI que usa los límites dinámicos
         if distancia > self.limite_amarillo:
             alerta = "Muy lejos"
         elif self.limite_amarillo >= distancia > self.limite_rojo:
@@ -191,7 +197,7 @@ class Inicioscreen(QMainWindow):
 print("""
     _____ ____  ___    ____  __ __
   / ___// __ \/   |  / __ \/ //_/
-  \__ \/ /_/ / /| | / /_/ / ,<   
+  \__ \\/ /_/ / /| | / /_/ / ,<   
  ___/ / ____/ ___ |/ _, _/ /| |  
 /____/_/   /_/  |_/_/ |_/_/ |_|  
 Sensor de Proximidad Automático 
