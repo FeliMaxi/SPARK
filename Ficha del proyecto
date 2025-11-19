@@ -1,0 +1,42 @@
+S.P.A.R.K.
+(Sensor de Proximidad Automático para Riesgos Kinéticos)
+
+Descripción general:
+ S.P.A.R.K. es un sistema de asistencia para conductores, diseñado para ayudar en maniobras de estacionamiento y situaciones de baja velocidad, alertando sobre la proximidad de objetos u obstáculos. El objetivo principal es reducir riesgos de colisión y daños al vehículo, ofreciendo una guía intuitiva basada en la distancia a obstáculos cercanos.
+
+
+Objetivos del proyecto:
+Medir la distancia entre el vehículo y objetos cercanos utilizando sensores de proximidad.
+
+Alertar al conductor de manera visual y/o sonora según la cercanía del objeto.
+
+Facilitar maniobras de estacionamiento, especialmente en espacios reducidos.
+
+Mejorar la seguridad vial y reducir riesgos de accidentes menores durante maniobras.
+
+
+Componentes principales:
+Sensor de proximidad: Puede ser ultrasónico, infrarrojo o láser, que mide la distancia al objeto más cercano.
+
+Unidad de control: Microcontrolador (Arduino) para procesar las lecturas del sensor.
+
+Interfaz de usuario: Pantalla o labels en la aplicación PySide6 que muestran la distancia y un mensaje de alerta.
+
+
+Alertas:
+
+Muy cerca → Advertencia crítica
+
+Perfecto → Distancia segura
+
+Muy lejos → Indica que no hay peligro inmediato
+
+
+Funcionamiento:
+El sensor detecta la distancia entre el vehículo y cualquier objeto frente o detrás del mismo.
+
+El microcontrolador procesa los datos y los clasifica en rangos de alerta.
+
+La interfaz visualiza la distancia actual y muestra un mensaje correspondiente: “Muy cerca”, “Perfecto” o “Muy lejos”.
+
+Opcionalmente, se puede integrar un sistema de alerta sonora que varíe su frecuencia según la proximidad del objeto.
