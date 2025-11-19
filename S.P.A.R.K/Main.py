@@ -29,10 +29,14 @@ def obtener_clima():
             descripcion = data["weather"][0]["description"]
             return f"{temp}°C — {descripcion.capitalize()}"
         else:
-            return "Sin datos"
+            print("Error API clima. Código:", response.status_code)
+            return "Clima: error API"
+    except requests.exceptions.RequestException as e:
+        print("Error de red obteniendo clima:", e)
+        return "Clima: sin conexión"
     except Exception as e:
-        print("Error obteniendo clima:", e)
-        return "Sin datos"
+        print("Error inesperado obteniendo clima:", e)
+        return "Clima: error"
 
 
 # === FUNCIÓN PARA DETECTAR SISTEMA OPERATIVO Y PUERTO ===
@@ -60,6 +64,15 @@ class MainWindow(QMainWindow):
         self.Alerta = "Sin datos"
         self.clima = obtener_clima()
 
+        # Buffer para promedio móvil
+        self.lecturas = []
+        self.max_lecturas = 5
+
+        # Tiempo de la última lectura válida
+        self.ultimo_dato_time = None
+        # Umbral para considerar que no hay datos recientes (en segundos)
+        self.timeout_sin_datos = 3
+
         # Intentar conectar con Arduino según la plataforma
         try:
             puerto = puerto_arduino()
@@ -70,6 +83,8 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print("⚠️ No se pudo conectar al Arduino:", e)
             self.arduino = None
+            # Mostrar en UI que no hay Arduino
+            self.Alerta = "Arduino no conectado"
 
         # Timer para leer datos del Arduino
         self.timer = QTimer()
@@ -85,38 +100,85 @@ class MainWindow(QMainWindow):
 
     # === Actualizar la interfaz ===
     def actualizar_labels(self):
-        self.ui.label.setText(f"Distancia: {int(self.Distancia/10)} cm")
+        # Distancia
+        try:
+            distancia_int = int(self.Distancia)
+        except (ValueError, TypeError):
+            distancia_int = 0
+
+        if distancia_int == 790:
+            self.ui.label.setText("Distancia: Calculando...")
+        else:
+            self.ui.label.setText(f"Distancia: {distancia_int} cm")
+
+        # Mensaje de alerta
         self.ui.label_2.setText(self.Alerta)
+
+        # Clima
         self.ui.label_3.setText(f"Clima: {self.clima}")
+
+        # Forzar repintado
         self.ui.label.repaint()
         self.ui.label_2.repaint()
         self.ui.label_3.repaint()
 
     # === Lectura de datos desde Arduino ===
     def actualizar_datos(self):
-        if self.arduino and self.arduino.in_waiting > 0:
-            try:
+        # Si no hay Arduino, solo refrescamos labels y salimos
+        if not self.arduino:
+            self.actualizar_labels()
+            return
+
+        try:
+            if self.arduino.in_waiting > 0:
                 linea = self.arduino.readline().decode(errors="ignore").strip()
-                print("Dato recibido:", linea)  # 👈 DEBUG
+                print("Dato recibido:", linea)  # DEBUG
+
                 if linea.isdigit():
                     distancia = int(linea)
-                    alerta = self.calcular_alerta(distancia)
-                    self.Distancia = distancia
-                    self.Alerta = alerta
-                    self.actualizar_labels()
-            except Exception as e:
-                print("Error leyendo del Arduino:", e)
+
+                    # Filtrar valores imposibles
+                    if distancia < 0 or distancia > 800:
+                        return
+
+                    # Buffer de lecturas
+                    self.lecturas.append(distancia)
+                    if len(self.lecturas) > self.max_lecturas:
+                        self.lecturas.pop(0)
+
+                    distancia_filtrada = sum(self.lecturas) / len(self.lecturas)
+
+                    self.Distancia = distancia_filtrada
+                    self.Alerta = self.calcular_alerta(distancia_filtrada)
+
+                    # Guardar hora del último dato bueno
+                    self.ultimo_dato_time = time.time()
+                # si la línea no es dígito, la ignoro
+            # Si no hay nada en el buffer serie
+            else:
+                # Si hay Arduino pero hace rato que no llegan datos, avisar
+                if self.ultimo_dato_time is not None:
+                    if time.time() - self.ultimo_dato_time > self.timeout_sin_datos:
+                        self.Alerta = "Sin datos recientes"
+
+            self.actualizar_labels()
+
+        except Exception as e:
+            print("Error leyendo del Arduino:", e)
+            self.Alerta = "Error de lectura"
+            self.actualizar_labels()
 
     # === Cálculo de alerta según distancia ===
     def calcular_alerta(self, distancia):
-        distance = distancia / 10
+        distance = float(distancia)
+
         if distance > 20:
             return 'Muy lejos'
         elif 20 >= distance > 10:
             return 'Baja la velocidad'
         elif 10 >= distance > 0:
             return 'Cuidado'
-        elif 0 >= distance:
+        elif distance == 0:
             return 'R.I.P'
         else:
             return 'Sin datos'
@@ -165,8 +227,8 @@ class Inicioscreen(QMainWindow):
 # === ASCII ART ===
 print("""
    _____ ____  ___    ____  __ __
-  / ___// __ \/   |  / __ \/ //_/
-  \__ \/ /_/ / /| | / /_/ / ,<   
+  / ___// __ \\/   |  / __ \\/ //_/
+  \\__ \\/ /_/ / /| | / /_/ / ,<   
  ___/ / ____/ ___ |/ _, _/ /| |  
 /____/_/   /_/  |_/_/ |_/_/ |_|  
 Sensor de Proximidad Automático 
