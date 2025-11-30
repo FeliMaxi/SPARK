@@ -2,32 +2,95 @@ import sys
 import os
 import time
 import serial
-import serial.tools.list_ports # Necesario para detectar_puerto_arduino
+import serial.tools.list_ports
 import requests
 import platform
+import smtplib
+from email.mime.text import MIMEText
 from PySide6.QtGui import QPixmap
-from PySide6.QtCore import QTimer, QEvent, Qt # Importar Qt para alineación si se necesita
-from PySide6.QtWidgets import QApplication, QMainWindow, QLabel, QMessageBox # Importar QMessageBox para notificaciones de error
+from PySide6.QtCore import QTimer, QEvent, Qt
+from PySide6.QtWidgets import QApplication, QMainWindow, QLabel, QMessageBox 
 
 # === IMPORTACIÓN DE UI ===
-from UI_Spark import Ui_SparkWindow # Versión A usa Ui_SparkWindow
+from UI_Spark import Ui_SparkWindow
 from UI_Inicio import Ui_InicioScreen
-from UI_Config import Ui_ConfigWindow # Necesario para la ventana de configuración
+from UI_Config import Ui_ConfigWindow
+
+
+# --- CONFIGURACIÓN DE CORREO ELECTRÓNICO ---
+SMTP_SERVER = 'smtp.gmail.com' 
+SMTP_PORT = 587
+EMAIL_SENDER = "sparkprojectitsv@gmail.com"
+EMAIL_PASSWORD = 'ikmi wiqq iqxr eqpw' 
+EMAIL_RECEIVER = 'f.arias@itsv.edu.ar' 
+
+
+def enviar_correo_notificacion(limite_rojo, limite_amarillo):
+    """Envía un correo electrónico notificando los nuevos límites establecidos."""
+    
+    if EMAIL_SENDER == 'tu_correo@gmail.com':
+        print("\nADVERTENCIA CORREO: Las credenciales de correo no han sido configuradas. Correo de notificación omitido.")
+        return False
+        
+    subject = "NOTIFICACIÓN SPARK: Nuevos Límites Establecidos"
+    body = f"""
+    Estimado usuario,
+
+    Se han actualizado los límites de proximidad en el sistema SPARK.
+
+    Nuevos Valores:
+    - Límite Rojo (Peligro Inminente): {limite_rojo} cm
+    - Límite Amarillo (Advertencia/Perfecto): {limite_amarillo} cm
+
+    Fecha y Hora del cambio: {time.strftime('%Y-%m-%d %H:%M:%S')}
+
+    Estos nuevos parámetros regirán la lógica de alerta del sistema y los LEDs del Arduino.
+
+    Saludos,
+    Sistema de Notificaciones SPARK
+    """
+
+    msg = MIMEText(body)
+    msg['Subject'] = subject
+    msg['From'] = EMAIL_SENDER
+    msg['To'] = EMAIL_RECEIVER
+
+    try:
+        # 1. Conexión y protocolo TLS
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls()
+        
+        # 2. Inicio de sesión
+        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        
+        # 3. Envío del correo
+        server.sendmail(EMAIL_SENDER, EMAIL_RECEIVER, msg.as_string())
+        server.quit()
+        print(f"DEBUG: Correo de notificación enviado a {EMAIL_RECEIVER}")
+        return True
+    except smtplib.SMTPAuthenticationError:
+        print("\nERROR CORREO: Fallo de autenticación. Verifica EMAIL_SENDER y EMAIL_PASSWORD (¿Usaste Clave de Aplicación si usas Gmail?).")
+        return False
+    except Exception as e:
+        print(f"\nERROR CORREO: No se pudo enviar el correo: {e}")
+        return False
 
 
 # --- PARTE 1: Funciones de Conexión y Clima ---
 
-# === FUNCIÓN PARA DETECTAR AUTOMÁTICAMENTE EL PUERTO ARDUINO (Mejor de Versión A) ===
+# === FUNCIÓN PARA DETECTAR AUTOMÁTICAMENTE EL PUERTO ARDUINO ===
 def detectar_puerto_arduino():
     """Detecta el puerto donde está conectado un Arduino, CH340, o dispositivo USB genérico."""
     puertos = serial.tools.list_ports.comports()
     for p in puertos:
-        # La detección basada en descripción es más robusta que COMx fijo.
-        if "Arduino" in p.description or "CH340" in p.description or ("USB" in p.description and platform.system() != "Linux"):
-            return p.device
-        # Para Linux, ttyACM0 y ttyUSB0 son comunes, se pueden añadir si no se detecta por descripción
+        # Compatibilidad con Linux/macOS
         if platform.system() == "Linux" and ("ttyACM" in p.device or "ttyUSB" in p.device):
+             return p.device
+
+        # Compatibilidad universal/Windows
+        if "Arduino" in p.description or "CH340" in p.description or "USB" in p.description:
             return p.device
+
     return None
 
 # === CONFIGURACIÓN CLIMA ===
@@ -37,7 +100,7 @@ URL = f"http://api.openweathermap.org/data/2.5/weather?q={CIUDAD}&appid={API_KEY
 
 
 def obtener_clima():
-    """Obtiene el clima actual y devuelve un texto para mostrar (Mejor de Versión B)."""
+    """Obtiene el clima actual y devuelve un texto para mostrar."""
     try:
         response = requests.get(URL, timeout=5)
         if response.status_code == 200:
@@ -56,7 +119,7 @@ def obtener_clima():
         return "Clima: error"
 
 
-# --- PARTE 2: Ventana de Configuración (De Versión A) ---
+# --- PARTE 2: Ventana de Configuración ---
 
 class ConfigWindow(QMainWindow):
     def __init__(self, parent=None):
@@ -67,15 +130,15 @@ class ConfigWindow(QMainWindow):
 
         # Establecer valores iniciales en los SpinBox
         if parent:
-             self.ui.spinBox.setValue(parent.limite_rojo)
-             self.ui.spinBox_2.setValue(parent.limite_amarillo)
+            self.ui.spinBox.setValue(parent.limite_rojo)
+            self.ui.spinBox_2.setValue(parent.limite_amarillo)
 
         self.ui.pushButton.clicked.connect(self.aplicar_parametros)
 
     def aplicar_parametros(self):
         """
-        Lee los valores de los SpinBox, los aplica a la ventana Spark
-        y los envía al Arduino.
+        Lee los valores de los SpinBox, los aplica, envía al Arduino 
+        y envía la notificación por correo.
         """
         if not self.parent_window:
             return
@@ -84,38 +147,38 @@ class ConfigWindow(QMainWindow):
         limite_amarillo = self.ui.spinBox_2.value()
 
         if limite_rojo >= limite_amarillo:
-             QMessageBox.warning(self, "Error de Configuración", 
-                                "El Límite Rojo debe ser estrictamente menor que el Límite Amarillo.")
-             return
+            QMessageBox.warning(self, "Error de Configuración", 
+                                 "El Límite Rojo debe ser estrictamente menor que el Límite Amarillo.")
+            return
 
         # 1. Asigna los nuevos límites a la ventana principal de Python (para la UI)
         self.parent_window.limite_rojo = limite_rojo
         self.parent_window.limite_amarillo = limite_amarillo
 
         # 2. **ENVÍO DE LÍMITES AL ARDUINO**
-        # Se envía una cadena de texto para que el Arduino actualice sus umbrales
         if self.parent_window.arduino and self.parent_window.arduino.is_open:
             try:
-                # Protocolo 'L' de Versión A
                 mensaje = f"L{limite_rojo}:{limite_amarillo}\n" 
                 self.parent_window.arduino.write(mensaje.encode('utf-8'))
                 print(f"DEBUG: Enviado a Arduino: {mensaje.strip()}")
             except Exception as e:
                 print(f"DEBUG: Error al enviar límites al Arduino: {e}")
         
+        # 3. **ENVÍO DE CORREO DE NOTIFICACIÓN**
+        enviar_correo_notificacion(limite_rojo, limite_amarillo)
+
         print(f"Nuevos límites aplicados en Python: rojo={limite_rojo} cm, amarillo={limite_amarillo} cm")
 
-        # 3. Vuelve a la pantalla principal
+        # 4. Vuelve a la pantalla principal
         self.close()
         self.parent_window.show()
 
 
-# --- PARTE 3: Ventana Principal (Combinando ambas) ---
+# --- PARTE 3: Ventana Principal ---
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        # Se usa Ui_SparkWindow de Versión A (asumiendo que tiene el botón de config)
         self.ui = Ui_SparkWindow() 
         self.ui.setupUi(self)
 
@@ -128,11 +191,11 @@ class MainWindow(QMainWindow):
         self.Alerta = "Cargando..."
         self.clima = obtener_clima()
 
-        # Buffer para promedio móvil (De Versión B)
+        # Buffer para promedio móvil
         self.lecturas = []
         self.max_lecturas = 5
 
-        # Tiempo de la última lectura válida (De Versión B)
+        # Tiempo de la última lectura válida
         self.ultimo_dato_time = None
         self.timeout_sin_datos = 3
 
@@ -140,35 +203,37 @@ class MainWindow(QMainWindow):
         puerto = detectar_puerto_arduino()
         if puerto:
             try:
-                # Usar timeout bajo de Versión A
                 self.arduino = serial.Serial(puerto, 9600, timeout=0.1) 
-                time.sleep(2) # Espera por si el Arduino se reinicia
+                time.sleep(2) 
                 self.arduino.flushInput() 
-                print(f"✅ Conectado al Arduino en {puerto}")
+                print(f" Conectado al Arduino en {puerto}")
                 
                 # Enviar límites iniciales al Arduino (importante al inicio)
                 self.enviar_limites_a_arduino()
             
             except serial.SerialException as e:
-                print(f"⚠️ No se pudo abrir el puerto {puerto} del Arduino: {e}")
+                if platform.system() == 'Linux' and 'Permission denied' in str(e):
+                    print(f"\n¡ADVERTENCIA DE LINUX! Falta permiso para acceder al puerto {puerto}. Use 'sudo usermod -a -G dialout $USER'")
+                else:
+                    print(f" No se pudo abrir el puerto {puerto} del Arduino: {e}")
                 self.arduino = None
                 self.Alerta = "Arduino no conectado"
         else:
-            print("⚠️ No se detectó Arduino conectado.")
+            print(" No se detectó Arduino conectado.")
             self.arduino = None
             self.Alerta = "Arduino no conectado"
 
-        # Timer para lectura de datos (De Versión A, 200ms)
+        # Timer para lectura de datos (200ms)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.actualizar_datos)
         self.timer.start(200) 
 
-        # Timer para actualizar el clima cada 10 minutos (De Versión B)
+        # Timer para actualizar el clima
         self.timer_clima = QTimer(self)
         self.timer_clima.timeout.connect(self.actualizar_clima)
         self.timer_clima.start(600000)
 
-        # Conectar botón de configuración (De Versión A)
+        # Conectar botón de configuración
         self.ui.configButton.clicked.connect(self.abrir_config) 
         
         self.actualizar_labels()
@@ -185,12 +250,12 @@ class MainWindow(QMainWindow):
                 print(f"DEBUG: Error al enviar límites iniciales: {e}")
 
     def abrir_config(self):
-        """Abre la ventana de configuración y oculta la actual (De Versión A)."""
+        """Abre la ventana de configuración y oculta la actual."""
         self.config_window = ConfigWindow(self)
         self.config_window.show()
         self.hide()
 
-    # === Lectura y Filtrado de datos desde Arduino (Combinación A y B) ===
+    # === Lectura y Filtrado de datos desde Arduino ===
     def actualizar_datos(self):
         """Lee datos del Arduino, los filtra y actualiza la UI."""
         
@@ -198,9 +263,6 @@ class MainWindow(QMainWindow):
             try:
                 linea_serial = self.arduino.readline() 
                 dato_str = linea_serial.decode('utf-8').strip()
-                
-                # PROTOCOLO: El Arduino DEBE enviar el dato con el prefijo 'D' o solo el número
-                # Priorizaremos el uso del número limpio o el protocolo 'D' de Versión A
                 
                 if dato_str.startswith('D'):
                     distancia_data = dato_str[1:] 
@@ -210,9 +272,9 @@ class MainWindow(QMainWindow):
                 if distancia_data.isdigit():
                     distancia = int(distancia_data)
                     
-                    # 1. Aplicar Filtro de Promedio Móvil (De Versión B)
+                    # 1. Aplicar Filtro de Promedio Móvil
                     if distancia < 0 or distancia > 800:
-                        return # Ignorar valores fuera de rango
+                        return 
 
                     self.lecturas.append(distancia)
                     if len(self.lecturas) > self.max_lecturas:
@@ -221,11 +283,10 @@ class MainWindow(QMainWindow):
                     distancia_filtrada = sum(self.lecturas) / len(self.lecturas)
                     self.Distancia = distancia_filtrada
                     self.Alerta = self.calcular_alerta(distancia_filtrada)
-                    self.ultimo_dato_time = time.time() # Guardar hora del último dato bueno
+                    self.ultimo_dato_time = time.time() 
 
                 elif dato_str:
-                    # Ignorar mensajes de depuración o de límite
-                    if not dato_str.startswith('L'):
+                    if not dato_str.startswith('L'): # Ignorar mensajes de límites
                         print(f"DEBUG: Mensaje Serial Ignorado: {dato_str}")
 
             except UnicodeDecodeError:
@@ -234,36 +295,34 @@ class MainWindow(QMainWindow):
                 print(f"DEBUG: Error inesperado en lectura serial: {e}")
                 self.Alerta = "Error de lectura"
         
-        # Lógica de timeout (De Versión B)
+        # Lógica de timeout
         elif self.arduino and self.ultimo_dato_time is not None:
-             if time.time() - self.ultimo_dato_time > self.timeout_sin_datos:
+            if time.time() - self.ultimo_dato_time > self.timeout_sin_datos:
                 self.Alerta = "Sin datos recientes"
-                self.Distancia = 0 # Opcional: Resetear Distancia
+                self.Distancia = 0 
 
         self.actualizar_labels()
 
 
-    # === Cálculo de alerta según límites dinámicos (Combinando A y B) ===
+    # === Cálculo de alerta según límites dinámicos ===
     def calcular_alerta(self, distancia):
         """Evalúa la distancia usando los límites configurables (rojo, amarillo)."""
         distance = float(distancia)
 
-        # Lógica de Versión A, usando los límites configurables
         if distance > self.limite_amarillo:
             return "Muy lejos"
         elif self.limite_amarillo >= distance > self.limite_rojo:
-            return "Perfecto / Baja la velocidad" # Combinando las ideas
+            return "Perfecto / Baja la velocidad"
         elif distance <= self.limite_rojo:
             return "Muy cerca / Cuidado"
         else:
-            return "Sin datos" # Caso por defecto o error
+            return "Sin datos"
 
 
-    # === Actualizar la interfaz (De Versión B con mejoras) ===
+    # === Actualizar la interfaz ===
     def actualizar_labels(self):
         """Actualiza los QLabel con los últimos datos."""
         
-        # Distancia: Mostrar solo 2 decimales o entero
         try:
             if isinstance(self.Distancia, float):
                 distancia_str = f"{self.Distancia:.2f}"
@@ -273,11 +332,7 @@ class MainWindow(QMainWindow):
              distancia_str = "N/A"
 
         self.ui.label.setText(f"Distancia: {distancia_str} cm")
-
-        # Mensaje de alerta
         self.ui.label_2.setText(self.Alerta)
-
-        # Clima
         self.ui.label_3.setText(f"Clima: {self.clima}")
 
         # Forzar repintado
@@ -290,7 +345,7 @@ class MainWindow(QMainWindow):
         self.actualizar_labels()
 
 
-# --- PARTE 4: Pantalla de Inicio (De Versión B) ---
+# --- PARTE 4: Pantalla de Inicio ---
 
 class Inicioscreen(QMainWindow):
     def __init__(self):
@@ -299,17 +354,15 @@ class Inicioscreen(QMainWindow):
         self.ui.setupUi(self)
 
         # === Imagen dentro del frame ===
-        # Mejor manejo de ruta de imagen (De Versión B)
         ruta_logo = os.path.join(os.path.dirname(__file__), "SPARK.png") 
         self.logo_label = QLabel(self.ui.frame)
         pixmap = QPixmap(ruta_logo)
         if pixmap.isNull():
-            print("⚠️ No se encontró la imagen:", ruta_logo)
+            print(" No se encontró la imagen:", ruta_logo)
         self.logo_label.setPixmap(pixmap)
         self.logo_label.setScaledContents(True)
         self.logo_label.setGeometry(self.ui.frame.rect())
 
-        # Para redimensionar automáticamente con el frame
         self.ui.frame.installEventFilter(self)
 
         # Botón para abrir la ventana principal
@@ -327,18 +380,17 @@ class Inicioscreen(QMainWindow):
         self.close()
 
 
-# --- PARTE 5: Ejecución ---
+# --- EJECUCIÓN ---
 
-# === ASCII ART ===
 print("""
-    _____ ____  ___   ____  __ __
-  / ___// __ \/   | / __ \/ //_/
-  \__ \/ /_/ / /| | / /_/ / ,<  
-  ___/ / ____/ ___ |/ _, _/ /| | 
+    _____ ____ ___    ____  __ __
+  / ___// __ \/   |  / __ \/ //_/
+  \__ \\/ /_/ / / | | / /_/ / ,< 
+ ___/ / ____/ ___ |/ _, _/ /| | 
 /____/_/   /_/  |_/_/ |_/_/ |_| 
 Sensor de Proximidad Automático 
-    para Riesgos Kinéticos
-""")
+   para Riesgos Kinéticos
+      """)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
