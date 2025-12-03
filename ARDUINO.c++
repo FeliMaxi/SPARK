@@ -44,6 +44,7 @@ void loop() {
       Serial.print(" / ");
       Serial.println(limite_amarillo);
     }
+  }
   long distancia = medirDistancia();
   Serial.print("Distancia: ");
   Serial.println(distancia);
